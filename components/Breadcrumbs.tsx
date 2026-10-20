@@ -35,18 +35,12 @@ export default function Breadcrumbs({ items }: BreadcrumbsProps) {
                 </span>
               ) : (
                 <>
-                  {item.href ? (
-                    <Link
-                      href={item.href}
-                      className="rounded px-1 text-[var(--color-accent-text)] hover:text-[var(--color-accent-text-hover)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent-fill)]"
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="px-1 text-[var(--color-text-primary)]">
-                      {item.label}
-                    </span>
-                  )}
+                  <Link
+                    href={item.href || "#"}
+                    className="text-[var(--color-accent-text)] hover:text-[var(--color-accent-text-hover)] rounded px-1"
+                  >
+                    {item.label}
+                  </Link>
                   <span className="text-[var(--color-text-muted)]" aria-hidden="true">
                     /
                   </span>
