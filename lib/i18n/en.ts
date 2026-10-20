@@ -190,11 +190,30 @@ const en: MessageCatalogue = {
   // ── Soroban transaction pipeline ──────────────────────────────────────
   "soroban.couldNotPrepare": "Could not prepare the transaction.",
   "soroban.signatureDeclined": "Signature was declined in your wallet.",
+  "soroban.couldNotSign": "Could not sign the transaction. Check your wallet and try again.",
+  "soroban.retrySignature": "Retry signature",
+  "soroban.prepareAgain": "The saved transaction is no longer usable. Submit again to prepare a fresh transaction; your inputs are saved.",
+  "soroban.rejectionPreserved": "Signature declined. Your inputs and prepared transaction are saved. You can retry when ready.",
   "soroban.networkRejected": "The network rejected the transaction.",
   "soroban.pendingConfirmation":
     "The transaction was submitted but has not confirmed yet. Check again in a moment.",
   "soroban.transactionFailed":
     "The transaction did not succeed (status: {status}).",
+
+  // ── Pending transactions ──────────────────────────────────────────────
+  "pending.title": "Transactions",
+  "pending.register": "Register {name}",
+  "pending.deactivate": "Deactivate {contract}",
+  "pending.stake": "Stake on {contract}",
+  "pending.withdraw": "Withdraw stake from {contract}",
+  "pending.building": "Preparing",
+  "pending.awaitingSignature": "Waiting for your wallet",
+  "pending.submitting": "Submitting",
+  "pending.confirming": "Confirming on the network",
+  "pending.succeeded": "Confirmed",
+  "pending.failed": "Failed",
+  "pending.failedFallback": "The transaction did not complete.",
+  "pending.dismiss": "Dismiss",
 
   // ── Stats ─────────────────────────────────────────────────────────────
   "stats.noOperationsYet": "No operations indexed yet.",

@@ -13,10 +13,12 @@ import { nativeToScVal } from '@stellar/stellar-sdk/base';
 import { REGISTRY_CATEGORIES, type RegistryCategory } from '@/lib/categories';
 import { NETWORK_PASSPHRASE, REGISTRY_CONTRACT_ID, SOROBAN_RPC_URL } from '@/lib/registry';
 import { createStellarDriver, submitContractCall, type TxPhase } from '@/lib/sorobanTx';
+import { trackTransaction } from '@/lib/pendingTransactions';
 import { formatStroops } from '@/lib/formatters';
 import { Button } from '@/components/ui/Button';
 import { Fieldset, TextField, TextareaField } from '@/components/ui/FormField';
 import { t } from '@/lib/i18n';
+import { transactionRecovery } from '@/lib/errorRecovery';
 
 
 export interface RegistrationInput {
@@ -51,46 +53,53 @@ const defaultRegister = async (
   // graph — see the matching note in OwnerContracts.
   const { signWithWallet } = await import('@/lib/wallet');
 
-  const result = await submitContractCall({
-    driver: createStellarDriver({
-      rpcUrl: SOROBAN_RPC_URL,
-      networkPassphrase: NETWORK_PASSPHRASE,
+  // Tracked so the write's progress survives the user leaving this page; the
+  // form's own phase state is lost on navigation. See `lib/pendingTransactions.ts`.
+  return trackTransaction(t('pending.register', { name: input.name }), async report => {
+    const result = await submitContractCall({
+      driver: createStellarDriver({
+        rpcUrl: SOROBAN_RPC_URL,
+        networkPassphrase: NETWORK_PASSPHRASE,
+        walletAddress: owner,
+      }),
+      call: {
+        contractId: REGISTRY_CONTRACT_ID,
+        method: 'register_contract',
+        args: [
+          nativeToScVal(owner, { type: 'address' }),
+          nativeToScVal(input.contractId, { type: 'address' }),
+          nativeToScVal(input.name, { type: 'string' }),
+          nativeToScVal(input.description, { type: 'string' }),
+          // The contract's fifth argument: a vec of category symbols. The
+          // per-element type spec is what makes nativeToScVal emit symbols
+          // rather than strings — a Soroban fieldless enum variant is a
+          // symbol on the wire. The contract rejects an empty list
+          // (`NoCategories`), which the form enforces before this runs.
+          //
+          // Ships with the contract upgrade that adds the argument: against the
+          // pre-categories build this invocation fails simulation, so the two
+          // releases are one deploy, not two (see the contract's DEPLOY.md).
+          nativeToScVal(input.categories, { type: input.categories.map(() => 'symbol') }),
+        ],
+      },
+      sign: async (xdr, opts) => {
+        const signResult = await signWithWallet(xdr, opts);
+        if ('error' in signResult) {
+          throw new Error(signResult.error);
+        }
+        return { signedTxXdr: signResult.signedTxXdr };
+      },
       walletAddress: owner,
-    }),
-    call: {
-      contractId: REGISTRY_CONTRACT_ID,
-      method: 'register_contract',
-      args: [
-        nativeToScVal(owner, { type: 'address' }),
-        nativeToScVal(input.contractId, { type: 'address' }),
-        nativeToScVal(input.name, { type: 'string' }),
-        nativeToScVal(input.description, { type: 'string' }),
-        // The contract's fifth argument: a vec of category symbols. The
-        // per-element type spec is what makes nativeToScVal emit symbols
-        // rather than strings — a Soroban fieldless enum variant is a
-        // symbol on the wire. The contract rejects an empty list
-        // (`NoCategories`), which the form enforces before this runs.
-        //
-        // Ships with the contract upgrade that adds the argument: against the
-        // pre-categories build this invocation fails simulation, so the two
-        // releases are one deploy, not two (see the contract's DEPLOY.md).
-        nativeToScVal(input.categories, { type: input.categories.map(() => 'symbol') }),
-      ],
-    },
-    sign: async (xdr, opts) => {
-      const signResult = await signWithWallet(xdr, opts);
-      if ('error' in signResult) {
-        throw new Error(signResult.error);
-      }
-      return { signedTxXdr: signResult.signedTxXdr };
-    },
-    walletAddress: owner,
-    networkPassphrase: NETWORK_PASSPHRASE,
-    onPhase,
-    onFeeEstimated,
-    wait,
+      networkPassphrase: NETWORK_PASSPHRASE,
+      onPhase: phase => {
+        report(phase);
+        onPhase(phase);
+      },
+      onFeeEstimated,
+      wait,
+    });
+    return { hash: result.hash };
   });
-  return { hash: result.hash };
 };
 
 const SUBMIT_LABEL_KEYS: Record<TxPhase, Parameters<typeof t>[0]> = {
@@ -123,6 +132,9 @@ export default function RegisterContractForm({
   const [message, setMessage] = useState('');
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [estimatedFee, setEstimatedFee] = useState<string | null>(null);
+  const [rejected, setRejected] = useState<{ key: string; error: WalletRejectedError } | null>(null);
+  const inputKey = JSON.stringify([walletAddress, contractId, name, description, categories]);
+  const canRetry = rejected?.key === inputKey;
 
   const busy = phase === 'building' || phase === 'awaiting-signature' || phase === 'submitting' || phase === 'confirming';
 
@@ -164,10 +176,13 @@ export default function RegisterContractForm({
     }
 
     setMessage('');
-    setEstimatedFee(null);
+    if (!canRetry) setEstimatedFee(null);
     setPhase('building');
     try {
-      const result = await register(input, walletAddress, setPhase, transactionWait, setEstimatedFee);
+      const result = canRetry
+        ? await rejected.error.retry()
+        : await register(input, walletAddress, setPhase, transactionWait, setEstimatedFee);
+      setRejected(null);
       if (result?.hash) {
         setTransactionHash(result.hash);
         sessionStorage.setItem(`tx-${Date.now()}`, result.hash);
@@ -183,6 +198,7 @@ export default function RegisterContractForm({
       onRegistered?.();
     } catch (err) {
       setPhase('error');
+      setRejected(err instanceof WalletRejectedError ? { key: inputKey, error: err } : null);
       setMessage(err instanceof Error ? err.message : t('register.registrationFailed'));
       if (transactionHash) {
         sessionStorage.setItem(`tx-${Date.now()}`, transactionHash);
@@ -261,7 +277,7 @@ export default function RegisterContractForm({
         loadingText={SUBMIT_LABELS[phase]}
         className="mt-1 w-full"
       >
-        {SUBMIT_LABELS[phase]}
+        {canRetry && !busy ? t('soroban.retrySignature') : SUBMIT_LABELS[phase]}
       </Button>
 
       {estimatedFee && phase !== 'idle' && phase !== 'success' && (
@@ -275,9 +291,15 @@ export default function RegisterContractForm({
           {message}
         </div>
       )}
-      {phase === 'error' && (
+      {phase === 'error' && canRetry && (
+        <div role="status" className="text-xs text-[var(--color-text-secondary)] bg-[var(--color-bg-subtle)] rounded-lg px-3 py-2.5">
+          {t('soroban.rejectionPreserved')}
+        </div>
+      )}
+      {phase === 'error' && !canRetry && (
         <div role="alert" className="text-xs text-[var(--color-error-text)] bg-[var(--color-error-bg)] rounded-lg px-3 py-2.5">
-          {message}
+          <p>{message}</p>
+          <p className="mt-1">{transactionRecovery(message)}</p>
         </div>
       )}
     </form>

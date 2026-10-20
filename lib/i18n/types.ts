@@ -165,9 +165,28 @@ export interface MessageCatalogue {
   // ── Soroban transaction pipeline ──────────────────────────────────────
   "soroban.couldNotPrepare": string;
   "soroban.signatureDeclined": string;
+  "soroban.couldNotSign": string;
+  "soroban.retrySignature": string;
+  "soroban.prepareAgain": string;
+  "soroban.rejectionPreserved": string;
   "soroban.networkRejected": string;
   "soroban.pendingConfirmation": string;
   "soroban.transactionFailed": string;
+
+  // ── Pending transactions ──────────────────────────────────────────────
+  "pending.title": string;
+  "pending.register": string;
+  "pending.deactivate": string;
+  "pending.stake": string;
+  "pending.withdraw": string;
+  "pending.building": string;
+  "pending.awaitingSignature": string;
+  "pending.submitting": string;
+  "pending.confirming": string;
+  "pending.succeeded": string;
+  "pending.failed": string;
+  "pending.failedFallback": string;
+  "pending.dismiss": string;
 
   // ── Stats ─────────────────────────────────────────────────────────────
   "stats.noOperationsYet": string;

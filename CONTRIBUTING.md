@@ -179,30 +179,14 @@ beyond it.
 This, with the analyzer above, closes [bundle budget issue
 #34](https://github.com/Lumeeena/lumina-frontend/issues/34).
 
-### Bundle contents
+## Wallet recovery and browser checks
 
-`npm run build:bundle` also generates browser source maps for a module inventory
-from the same Turbopack output as the size budget. `npm run bundle:contents`
-checks each route's synchronous chunks and shared runtime against
-`bundle-rules.json`. The CI bundle job runs both reports and uploads their JSON.
-Missing maps fail the contents check; package names are read from map sources,
-including nested/indexed maps, rather than guessed from minified JavaScript.
-Normal builds generate maps only when error reporting is configured. The
-contents job's maps are temporary build artifacts and are not deployed.
-
-The wallet kit is forbidden from every route's initial load; it belongs behind
-the wallet interaction. CodeMirror is allowed only in `/graphql`. Recharts is
-allowed in `/stats`, `/developers/usage`, `/accounts/[address]` and
-`/assets/[code]/[issuer]`. Deferred chunks are excluded, so lazy wallet selection
-remains valid. New routes are checked automatically, and a shared chunk affects
-every route that downloads it. `.next/bundle-contents.json` lists packages by
-route and chunk and explains each violation.
-
-To permit a dependency on another route, edit its `allowedRoutes` in
-`bundle-rules.json` with a reason in the PR. Raising `bundle-budget.json` never
-bypasses these content rules. The inventory proves emitted first-load contents;
-it does not prove when an interaction will execute a dynamic import or account
-for a third-party script injected outside Next's manifests.
+See [wallet rejection recovery](docs/wallet-rejection.md) for prepared-transaction
+retries, [hydration regressions](TESTING.md#hydration-regressions) for deterministic
+initial renders, and the [client component audit](docs/client-boundaries.md) for
+the registry/guide boundaries and measured JavaScript reductions.
+[Core Web Vitals budgets](docs/web-vitals.md) documents the per-route CI journeys,
+PR-base comparison, initial targets and baseline update workflow.
 
 ## Translation
 

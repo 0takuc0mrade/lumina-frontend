@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import BackendUnavailable from "@/components/BackendUnavailable";
 import { AreaChart } from "@/components/charts/AreaChart";
-import { formatSupply } from "@/components/AssetBrowser";
+import { formatSupply } from "@/lib/formatters";
 import { gqlFetch, GRAPHQL_URL } from "@/lib/graphql";
 import { truncateAddress } from "@/lib/formatters";
 import { routeMetadata } from "@/lib/metadata";
