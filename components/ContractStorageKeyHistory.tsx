@@ -29,8 +29,6 @@ interface ContractStorageKeyHistoryProps {
  * - Each value's ledger and timestamp
  */
 export default function ContractStorageKeyHistory({
-  contractId,
-  storageKey,
   history,
   currentValue,
   currentLedger,
@@ -43,7 +41,7 @@ export default function ContractStorageKeyHistory({
 
   const allEntries = [
     { value: currentValue, ledger: currentLedger, createdAt: new Date().toISOString(), isCurrent: true },
-    ...history,
+    ...history.map((entry) => ({ ...entry, isCurrent: false })),
   ];
 
   return (
@@ -111,7 +109,7 @@ export default function ContractStorageKeyHistory({
                   value={entry.value}
                   initialExpandedDepth={3}
                   showRawToggle
-                  rawValue={entry.value}
+                  rawValue={typeof entry.value === "string" ? entry.value : JSON.stringify(entry.value)}
                 />
               </div>
             </div>

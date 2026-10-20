@@ -568,6 +568,7 @@ export default function OwnerContracts({
                 </span>
               </p>
               {isOwner && (
+              <>
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   inputMode="numeric"
@@ -608,6 +609,7 @@ export default function OwnerContracts({
                   ))}
                 </ul>
               )}
+              </>
               )}
             </div>
 

@@ -8,7 +8,7 @@ import { gqlFetch, GRAPHQL_URL } from "@/lib/graphql";
 import { truncateAddress } from "@/lib/formatters";
 import { routeMetadata } from "@/lib/metadata";
 import { SITE_NAME } from "@/lib/site";
-import type { TypedDocumentString } from "@/lib/generated/graphql";
+import { TypedDocumentString } from "@/lib/generated/graphql";
 
 const BUCKET_SECONDS = 86_400;
 

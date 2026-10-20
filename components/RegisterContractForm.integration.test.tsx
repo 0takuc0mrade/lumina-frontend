@@ -56,7 +56,7 @@ function deferred<T>() {
 function fillAndSubmit() {
   fireEvent.change(screen.getByLabelText(/contract id/i), { target: { value: TARGET } });
   fireEvent.change(screen.getByLabelText(/project name/i), { target: { value: 'My Protocol' } });
-  fireEvent.click(screen.getByRole('button', { name: 'DeFi', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'DeFi' }));
   fireEvent.click(screen.getByRole('button', { name: /register contract/i }));
 }
 
@@ -81,7 +81,7 @@ afterEach(cleanup);
 
 describe('wallet transaction flow integration', () => {
   it('drives approval from the UI through the wallet boundary and every transaction phase', async () => {
-    const prepared = deferred<string>();
+    const prepared = deferred<{ xdr: string; estimatedFee: string }>();
     const signed = deferred<{ signedTxXdr: string }>();
     const sent = deferred<string>();
     const confirmed = deferred<string>();
