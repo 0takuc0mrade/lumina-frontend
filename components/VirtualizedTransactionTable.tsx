@@ -17,7 +17,6 @@ export default function VirtualizedTransactionTable({
   emptyMessage,
   children,
   initialScrollTop = 0,
-  onScrollTopChange,
 }: {
   transactions: Transaction[];
   emptyMessage: string | null;

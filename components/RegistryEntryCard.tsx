@@ -1,4 +1,3 @@
-'use client';
 
 /**
  * One entry in the public "Recently Registered" list.
@@ -9,26 +8,17 @@
  * per-contract read, so it is fetched the first time the section is expanded
  * rather than for every row up front.
  */
-import { useState } from 'react';
-import { getSlashes, type RegistryProfile, type SlashRecord } from '@/lib/registry';
+import type { RegistryProfile } from '@/lib/registry';
+import RegistrySlashHistory from './RegistrySlashHistory';
 import { CATEGORY_LABELS } from '@/lib/registry';
-import { formatStroops } from '@/lib/formatters';
 import { LifetimeSlashedBadge, StakeBadge, VerifiedBadge } from './RegistryBadges';
 import ContractLink from './ContractLink';
 
 export interface RegistryEntryCardProps {
   profile: RegistryProfile;
-  loadSlashes?: (contractId: string) => Promise<SlashRecord[]>;
 }
 
-const defaultLoadSlashes = (contractId: string) => getSlashes(contractId);
-
-export default function RegistryEntryCard({ profile, loadSlashes = defaultLoadSlashes }: RegistryEntryCardProps) {
-  const [open, setOpen] = useState(false);
-  const [slashes, setSlashes] = useState<SlashRecord[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
+export default function RegistryEntryCard({ profile }: RegistryEntryCardProps) {
   const { reputation } = profile;
 
   async function loadHistory() {

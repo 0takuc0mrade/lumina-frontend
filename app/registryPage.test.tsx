@@ -10,6 +10,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderToString } from 'react-dom/server';
+import { hydrateRoot, type Root } from 'react-dom/client';
 
 const connectWallet = vi.hoisted(() => vi.fn());
 const getConnectedWallet = vi.hoisted(() => vi.fn());
@@ -33,6 +35,7 @@ vi.mock("@/lib/wallet", () => ({
   readPersistedSession,
   disconnectWallet: vi.fn(),
   signWithWallet: vi.fn(),
+  checkNetworkMismatch: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/registry", async () => {
@@ -55,7 +58,18 @@ vi.mock("@/lib/graphql", () => ({
   PUBLIC_GRAPHQL_URL: "http://test/graphql",
 }));
 
-import RegistryPage from "./registry/page";
+import RegistryWorkspace from "@/components/RegistryWorkspace";
+import RegistryListing from "@/components/RegistryListing";
+
+vi.mock("next/cache", () => ({ unstable_cache: (read: () => unknown) => read }));
+vi.mock("@/app/registry/actions", () => ({ refreshRegistry: vi.fn() }));
+
+async function renderRegistry() {
+  const raw = new URLSearchParams(nav.query).get('category');
+  const { isCategory } = await import('@/lib/registry');
+  const listing = await RegistryListing({ category: isCategory(raw) ? raw : null });
+  return render(<RegistryWorkspace listing={listing} />);
+}
 
 const OWNER = "GOWNERAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const C1 = "CCONTRACTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -138,7 +152,7 @@ describe("RegistryPage", () => {
   });
 
   it("offers connection and the global list when no wallet is connected", async () => {
-    render(<RegistryPage />);
+    await renderRegistry();
 
     expect(
       await screen.findByRole("button", { name: /connect wallet/i }),
@@ -157,7 +171,7 @@ describe("RegistryPage", () => {
       profile("Staked One", { stake: BigInt(12_500_000_000), verified: true }),
     ]);
 
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("Staked One");
     // Icon *and* text — never colour alone.
@@ -171,7 +185,7 @@ describe("RegistryPage", () => {
   it("omits the badges an entry has not earned", async () => {
     getActiveProfiles.mockResolvedValue([profile("Plain One")]);
 
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("Plain One");
     expect(screen.queryByText("Verified")).toBeNull();
@@ -190,7 +204,7 @@ describe("RegistryPage", () => {
       },
     ]);
 
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("Slashed One");
     // Lazy: the per-contract read happens on expand, not for the whole list.
@@ -224,7 +238,7 @@ describe("RegistryPage", () => {
       profile("Slashed One", { slashedTotal: BigInt(250_000_000) }),
     ]);
 
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("Slashed One");
     expect(screen.getByText("Slashed 25 XLM")).toBeTruthy();
@@ -233,7 +247,7 @@ describe("RegistryPage", () => {
   it("shows the owner dashboard once a wallet connects", async () => {
     connectWallet.mockResolvedValue({ address: OWNER });
     getConnectedWallet.mockResolvedValue(session(OWNER));
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await userEvent.click(
       await screen.findByRole("button", { name: /connect wallet/i }),
@@ -246,7 +260,7 @@ describe("RegistryPage", () => {
 
   it("reports a refused wallet connection without breaking the page", async () => {
     connectWallet.mockResolvedValue({ error: "Modal closed" });
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await userEvent.click(
       await screen.findByRole("button", { name: /connect wallet/i }),
@@ -283,7 +297,7 @@ describe("RegistryPage", () => {
   it("opens on the owner dashboard when a wallet is already connected", async () => {
     readPersistedSession.mockReturnValue({ address: OWNER, walletId: "freighter" });
     getConnectedWallet.mockResolvedValue(session(OWNER));
-    render(<RegistryPage />);
+    await renderRegistry();
 
     expect(await screen.findByText("My Protocol")).toBeTruthy();
     expect(connectWallet).not.toHaveBeenCalled();
@@ -292,7 +306,7 @@ describe("RegistryPage", () => {
   it("confirms a persisted session without opening the picker", async () => {
     readPersistedSession.mockReturnValue({ address: OWNER, walletId: "freighter" });
     getConnectedWallet.mockResolvedValue(session(OWNER));
-    render(<RegistryPage />);
+    await renderRegistry();
 
     // The seeded state says "connected, still resolving" until this lands.
     expect(await screen.findByText("Freighter")).toBeTruthy();
@@ -301,7 +315,7 @@ describe("RegistryPage", () => {
   });
 
   it("never asks for a session when nothing is persisted", async () => {
-    render(<RegistryPage />);
+    await renderRegistry();
 
     expect(await screen.findByRole("button", { name: /connect wallet/i })).toBeTruthy();
     // No persisted session means nothing to confirm, so the wallet kit — which
@@ -318,7 +332,7 @@ describe("RegistryPage", () => {
       }),
     );
     getConnectedWallet.mockResolvedValue(session(OWNER));
-    render(<RegistryPage />);
+    await renderRegistry();
 
     const button = await screen.findByRole("button", { name: /connect wallet/i });
     await userEvent.click(button);
@@ -335,7 +349,7 @@ describe("RegistryPage", () => {
   it("switches back to the global list on demand", async () => {
     readPersistedSession.mockReturnValue({ address: OWNER, walletId: "freighter" });
     getConnectedWallet.mockResolvedValue(session(OWNER));
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("My Protocol");
     await userEvent.click(
@@ -349,7 +363,7 @@ describe("RegistryPage", () => {
     getActiveProfiles.mockRejectedValue(
       new Error("Registry simulation failed"),
     );
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toMatch(/temporarily unavailable/i),
@@ -364,7 +378,7 @@ describe("RegistryPage", () => {
       { ...profile("Payments Protocol", {}, ["Payments"]), contractId: "CPAYMENTS" },
     ]);
     nav.query = "category=Gaming";
-    render(<RegistryPage />);
+    await renderRegistry();
 
     expect(await screen.findByText("Gaming Protocol")).toBeTruthy();
     // The category view carries no reputation, so the filter is applied to the
@@ -372,16 +386,9 @@ describe("RegistryPage", () => {
     expect(screen.queryByText("Payments Protocol")).toBeNull();
   });
 
-  it("writes the chosen category to the URL", async () => {
-    render(<RegistryPage />);
-
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Gaming" }),
-    );
-
-    expect(nav.replace).toHaveBeenCalledWith("/registry?category=Gaming", {
-      scroll: false,
-    });
+  it("renders category links with shareable server navigation URLs", async () => {
+    await renderRegistry();
+    expect(screen.getByRole('link', { name: 'Gaming' }).getAttribute('href')).toBe('/registry?category=Gaming');
   });
 
   it("renders categories where present and no gap where absent", async () => {
@@ -389,7 +396,7 @@ describe("RegistryPage", () => {
       { ...profile("Tagged", {}, ["DeFi"]), contractId: "CTAGGED" },
       { ...profile("Legacy", {}, []), contractId: "CLEGACY" },
     ]);
-    render(<RegistryPage />);
+    await renderRegistry();
 
     await screen.findByText("Tagged");
     expect(screen.getAllByLabelText("Categories")).toHaveLength(1);

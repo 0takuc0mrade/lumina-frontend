@@ -132,6 +132,9 @@ export default function RegisterContractForm({
   const [message, setMessage] = useState('');
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [estimatedFee, setEstimatedFee] = useState<string | null>(null);
+  const [rejected, setRejected] = useState<{ key: string; error: WalletRejectedError } | null>(null);
+  const inputKey = JSON.stringify([walletAddress, contractId, name, description, categories]);
+  const canRetry = rejected?.key === inputKey;
 
   const busy = phase === 'building' || phase === 'awaiting-signature' || phase === 'submitting' || phase === 'confirming';
 
@@ -173,10 +176,13 @@ export default function RegisterContractForm({
     }
 
     setMessage('');
-    setEstimatedFee(null);
+    if (!canRetry) setEstimatedFee(null);
     setPhase('building');
     try {
-      const result = await register(input, walletAddress, setPhase, transactionWait, setEstimatedFee);
+      const result = canRetry
+        ? await rejected.error.retry()
+        : await register(input, walletAddress, setPhase, transactionWait, setEstimatedFee);
+      setRejected(null);
       if (result?.hash) {
         setTransactionHash(result.hash);
         sessionStorage.setItem(`tx-${Date.now()}`, result.hash);
@@ -192,6 +198,7 @@ export default function RegisterContractForm({
       onRegistered?.();
     } catch (err) {
       setPhase('error');
+      setRejected(err instanceof WalletRejectedError ? { key: inputKey, error: err } : null);
       setMessage(err instanceof Error ? err.message : t('register.registrationFailed'));
       if (transactionHash) {
         sessionStorage.setItem(`tx-${Date.now()}`, transactionHash);
@@ -270,7 +277,7 @@ export default function RegisterContractForm({
         loadingText={SUBMIT_LABELS[phase]}
         className="mt-1 w-full"
       >
-        {SUBMIT_LABELS[phase]}
+        {canRetry && !busy ? t('soroban.retrySignature') : SUBMIT_LABELS[phase]}
       </Button>
 
       {estimatedFee && phase !== 'idle' && phase !== 'success' && (
@@ -284,7 +291,12 @@ export default function RegisterContractForm({
           {message}
         </div>
       )}
-      {phase === 'error' && (
+      {phase === 'error' && canRetry && (
+        <div role="status" className="text-xs text-[var(--color-text-secondary)] bg-[var(--color-bg-subtle)] rounded-lg px-3 py-2.5">
+          {t('soroban.rejectionPreserved')}
+        </div>
+      )}
+      {phase === 'error' && !canRetry && (
         <div role="alert" className="text-xs text-[var(--color-error-text)] bg-[var(--color-error-bg)] rounded-lg px-3 py-2.5">
           <p>{message}</p>
           <p className="mt-1">{transactionRecovery(message)}</p>
